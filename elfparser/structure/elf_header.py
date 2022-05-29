@@ -1,6 +1,6 @@
 import struct
 
-class ElfHeader:
+class ElfHeader(dict):
 
     ELF_IDENTITY = {
         "magic":        '4s',
@@ -27,10 +27,12 @@ class ElfHeader:
     }
 
     def __init__(self, data):
+
         self._header = self.parse(data)
 
-    def __getitem__(self, key):
-        return self._header[key]
+        self.validate()
+        
+        super(ElfHeader, self).__init__(self._header)
 
     def parse(self, data):
 
@@ -46,16 +48,12 @@ class ElfHeader:
 
         elf_header = dict( zip( elf_header_keys, elf_header_values) )
 
-        elf_header["ident"] = elf_identity
+        header = dict({"ident":elf_identity})
+        header.update(elf_header)
 
-        return elf_header
+        return header
 
+    def validate(self):
 
-
-with open("elfparser\elf_test.axf", "rb") as f:
-    elf_buffer = f.read()
-
-elf_header = ElfHeader(elf_buffer)
-
-print(elf_header._header)
-print(elf_header["iden"])
+        # check identity magic
+        print(self._header["ident"])
