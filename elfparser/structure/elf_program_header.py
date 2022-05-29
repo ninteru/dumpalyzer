@@ -1,7 +1,7 @@
 import struct
 
 
-class ElfProgramHeader:
+class ElfProgramHeader(dict):
 
     ELF_PROGRAM_HEADER = {
         "type":         'I',
@@ -45,4 +45,3 @@ class ElfProgramHeader:
 
     def validate(self):
         pass
-    

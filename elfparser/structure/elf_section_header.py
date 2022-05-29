@@ -55,7 +55,13 @@ class ElfSectionHeader(dict):
 
         elf_section_header = dict( zip( elf_section_header_keys, elf_section_header_values) )
 
-        return elf_section_header
+        section_header = dict({"name_str":''})
+        section_header.update(elf_section_header)
+
+        return section_header
 
     def validate(self):
         pass
+
+    def set_name(self, name):
+        self["name_str"] = name
