@@ -26,6 +26,12 @@ class ElfHeader(dict):
         "shstrndx":     'H',
     }
 
+    EM_ARM = 40
+
+    ELF_CLASS_NONE  = 0
+    ELF_CLASS_32    = 1
+    ELF_CLASS_64    = 2
+
     def __init__(self, data):
 
         self._header = self.parse(data)
@@ -57,3 +63,13 @@ class ElfHeader(dict):
 
         # check identity magic
         print(self._header["ident"])
+        if self._header["ident"]["magic"] != b'\x7fELF':
+            raise ValueError
+
+        # check machine is ARM
+        if self._header["machine"] != 40:
+            raise ValueError
+
+        # check class
+        if self._header["ident"]["class"] != self.ELF_CLASS_32:
+            raise ValueError

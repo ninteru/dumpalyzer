@@ -2,6 +2,7 @@ from structure.elf_header import ElfHeader
 from structure.elf_program_header import ElfProgramHeader
 from structure.elf_section_header import ElfSectionHeader
 from structure.elf_string import ElfString
+from structure.elf_symbol import ElfSymbol
 
 from pprint import pprint
 
@@ -42,10 +43,29 @@ class ElfParser(dict):
             name = elf_sh_string_table.get_string(sh["name"])
             sh.set_name(name)
 
+        symbol_table_sh = next(header for header in elf_sh_table if header["type"] == 2)
+        symbol_table_sh_offset  = symbol_table_sh["offset"]
+        symbol_table_sh_size    = symbol_table_sh["size"]
+        symbol_table_sh_entsize = symbol_table_sh["entsize"]
+        symbol_table_sh_end     = symbol_table_sh_offset + symbol_table_sh_size
+
+        elf_symbol_table = [ElfSymbol(elf_buffer[i:i+symbol_table_sh_entsize]) for i in range(symbol_table_sh_offset, symbol_table_sh_end, symbol_table_sh_entsize)]
+
+        symbol_table_string_table_sh = elf_sh_table[symbol_table_sh["link"]]
+        symbol_table_string_table_sh_offset = symbol_table_string_table_sh["offset"]
+        symbol_table_string_table_sh_size   = symbol_table_string_table_sh["size"]
+
+        elf_symbol_string_table = ElfString(elf_buffer[symbol_table_string_table_sh_offset:symbol_table_string_table_sh_offset+symbol_table_string_table_sh_size])
+
+        for symbol in elf_symbol_table:
+            name = elf_symbol_string_table.get_string(symbol["name"])
+            symbol.set_name(name)
+
         elf = dict()
         elf["header"] = elf_header
         elf["sh_table"] = elf_sh_table
         elf["ph_table"] = elf_ph_table
+        elf["symbols"] = elf_symbol_table
 
         super(ElfParser, self).__init__(elf)
 

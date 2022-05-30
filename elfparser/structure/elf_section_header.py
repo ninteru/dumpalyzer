@@ -47,6 +47,7 @@ class ElfSectionHeader(dict):
 
         super(ElfSectionHeader, self).__init__(self._section_header)
 
+
     def parse(self, data):
 
         elf_section_header_t = struct.Struct(" ".join(member for member in self.ELF_SECTION_HEADER.values()))
@@ -60,8 +61,11 @@ class ElfSectionHeader(dict):
 
         return section_header
 
+
     def validate(self):
         pass
 
+
     def set_name(self, name):
+
         self["name_str"] = name
