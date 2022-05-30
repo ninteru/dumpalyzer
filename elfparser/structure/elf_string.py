@@ -20,3 +20,8 @@ class ElfString:
             index += 1
 
         return string
+
+    def get_all_strings(self):
+
+        return [string.decode() for string in self._string_table.split(b'\0')]
+        

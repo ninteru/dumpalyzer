@@ -1,6 +1,8 @@
 from structure.elf_header import ElfHeader
+
 from structure.elf_program_header import ElfProgramHeader
 from structure.elf_section_header import ElfSectionHeader
+
 from structure.elf_string import ElfString
 from structure.elf_symbol import ElfSymbol
 
@@ -8,70 +10,90 @@ from pprint import pprint
 
 class ElfParser(dict):
 
-    def __init__(self, elf_buffer):
+    def __init__(self, buffer):
 
-        self._buffer = elf_buffer
+        self.__buffer = buffer
 
-        elf_header = ElfHeader(elf_buffer[:52])
+        super(ElfParser, self).__init__()
+
+        self.__parse_header()
+        self.__parse_section_header_table()
+        self.__parse_program_header_table()
+        self.__parse_symbol_table()
         
-        e_shoff     = elf_header["shoff"]
-        e_shentsize = elf_header["shentsize"]
-        e_shnum     = elf_header["shnum"]
-        e_shend     = e_shoff + ( e_shentsize * e_shnum )
+    def __parse_header(self):
+        """create elf header from first 52 bytes of the buffer"""
 
-        sh_table_buffers = [elf_buffer[i:i+e_shentsize] for i in range(e_shoff, e_shend, e_shentsize)]
+        self["header"] = ElfHeader(self.__buffer[:52])
+        
+    def __parse_section_header_table(self):
+        """create section header table from buffer"""
 
-        elf_sh_table = [ElfSectionHeader(sh_buffer) for sh_buffer in sh_table_buffers]
+        e_shoff     = self["header"]["shoff"]
+        e_shentsize = self["header"]["shentsize"]
+        e_shnum     = self["header"]["shnum"]
 
-        e_phoff     = elf_header["phoff"]
-        e_phentsize = elf_header["phentsize"]
-        e_phnum     = elf_header["phnum"]
-        e_phend     = e_phoff + ( e_phentsize * e_phnum )
+        e_shend     = e_shoff + (e_shentsize * e_shnum)
 
-        ph_table_buffers = [elf_buffer[i:i+e_phentsize] for i in range(e_phoff, e_phend, e_phentsize)]
+        self["sh_table"] = [ElfSectionHeader(self.__buffer[i:i+e_shentsize]) for i in range(e_shoff, e_shend, e_shentsize)]
 
-        elf_ph_table = [ElfProgramHeader(ph_buffer) for ph_buffer in ph_table_buffers]
+        self.__parse_section_string_table()
 
-        e_shstrndx              = elf_header["shstrndx"]
-        string_table_sh         = elf_sh_table[e_shstrndx]
-        string_table_sh_offset  = string_table_sh["offset"]
-        string_table_sh_size    = string_table_sh["size"]
+    def __parse_program_header_table(self):
+        """create program header table from buffer"""
 
-        elf_sh_string_table = ElfString(elf_buffer[string_table_sh_offset:string_table_sh_offset+string_table_sh_size])
+        e_phoff     = self["header"]["phoff"]
+        e_phentsize = self["header"]["phentsize"]
+        e_phnum     = self["header"]["phnum"]
 
-        for sh in elf_sh_table:
-            name = elf_sh_string_table.get_string(sh["name"])
-            sh.set_name(name)
+        e_phend     = e_phoff + (e_phentsize * e_phnum)
 
-        symbol_table_sh = next(header for header in elf_sh_table if header["type"] == 2)
-        symbol_table_sh_offset  = symbol_table_sh["offset"]
-        symbol_table_sh_size    = symbol_table_sh["size"]
-        symbol_table_sh_entsize = symbol_table_sh["entsize"]
-        symbol_table_sh_end     = symbol_table_sh_offset + symbol_table_sh_size
+        self["ph_table"] = [ElfProgramHeader(self.__buffer[i:i+e_phentsize]) for i in range(e_phoff, e_phend, e_phentsize)]
 
-        elf_symbol_table = [ElfSymbol(elf_buffer[i:i+symbol_table_sh_entsize]) for i in range(symbol_table_sh_offset, symbol_table_sh_end, symbol_table_sh_entsize)]
+    def __parse_symbol_table(self):
+        """create symbol table from buffer"""
 
-        symbol_table_string_table_sh = elf_sh_table[symbol_table_sh["link"]]
-        symbol_table_string_table_sh_offset = symbol_table_string_table_sh["offset"]
-        symbol_table_string_table_sh_size   = symbol_table_string_table_sh["size"]
+        # symbol table is identified by section header type (2)
+        symtab_sh           = next(header for header in self["sh_table"] if header["type"] == 2)
+        symtab_sh_offset    = symtab_sh["offset"]
+        symtab_sh_size      = symtab_sh["size"]
+        symtab_sh_entsize   = symtab_sh["entsize"]
+        symtab_sh_end       = symtab_sh_offset + symtab_sh_size
 
-        elf_symbol_string_table = ElfString(elf_buffer[symbol_table_string_table_sh_offset:symbol_table_string_table_sh_offset+symbol_table_string_table_sh_size])
+        self["symtab"] = [ElfSymbol(buffer[i:i+symtab_sh_entsize]) for i in range(symtab_sh_offset, symtab_sh_end, symtab_sh_entsize)]
 
-        for symbol in elf_symbol_table:
-            name = elf_symbol_string_table.get_string(symbol["name"])
-            symbol.set_name(name)
+        self.__parse_symbol_string_table(symtab_sh["link"])
 
-        elf = dict()
-        elf["header"] = elf_header
-        elf["sh_table"] = elf_sh_table
-        elf["ph_table"] = elf_ph_table
-        elf["symbols"] = elf_symbol_table
+    def __parse_section_string_table(self):
 
-        super(ElfParser, self).__init__(elf)
+        e_shstrndx = self["header"]["shstrndx"]
+
+        shstrtab = self["sh_table"][e_shstrndx]
+
+        shstrtab_offset = shstrtab["offset"]
+        shstrtab_size   = shstrtab["size"]
+
+        shstrtab_end    = shstrtab_offset + shstrtab_size
+
+        sh_strings = ElfString(self.__buffer[shstrtab_offset:shstrtab_end])
+
+        for section in self["sh_table"]:
+            section.set_name(sh_strings.get_string(section["name"]))
+
+    def __parse_symbol_string_table(self, link):
+
+        symtab_strtab_sh = self["sh_table"][link]
+        symtab_strtab_sh_offset = symtab_strtab_sh["offset"]
+        symtab_strtab_sh_size   = symtab_strtab_sh["size"]
+
+        symtab_strings = ElfString(buffer[symtab_strtab_sh_offset:symtab_strtab_sh_offset+symtab_strtab_sh_size])
+
+        for symbol in self["symtab"]:
+            symbol.set_name(symtab_strings.get_string(symbol["name"]))
 
 with open("elfparser\elf_test.axf", "rb") as f:
-    elf_buffer = f.read()
+    buffer = f.read()
 
-elf = ElfParser(elf_buffer)
+elf = ElfParser(buffer)
 
 pprint(elf, sort_dicts=False)
