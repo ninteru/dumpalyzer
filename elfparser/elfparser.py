@@ -1,10 +1,10 @@
-from structure.elf_header import ElfHeader
+from .structure.elf_header import ElfHeader
 
-from structure.elf_program_header import ElfProgramHeader
-from structure.elf_section_header import ElfSectionHeader
+from .structure.elf_program_header import ElfProgramHeader
+from .structure.elf_section_header import ElfSectionHeader
 
-from structure.elf_string import ElfString
-from structure.elf_symbol import ElfSymbol
+from .structure.elf_string import ElfString
+from .structure.elf_symbol import ElfSymbol
 
 from pprint import pprint
 
@@ -60,7 +60,7 @@ class ElfParser(dict):
         symtab_sh_entsize   = symtab_sh["entsize"]
         symtab_sh_end       = symtab_sh_offset + symtab_sh_size
 
-        self["symtab"] = [ElfSymbol(buffer[i:i+symtab_sh_entsize]) for i in range(symtab_sh_offset, symtab_sh_end, symtab_sh_entsize)]
+        self["symtab"] = [ElfSymbol(self.__buffer[i:i+symtab_sh_entsize]) for i in range(symtab_sh_offset, symtab_sh_end, symtab_sh_entsize)]
 
         self.__parse_symbol_string_table(symtab_sh["link"])
 
@@ -86,14 +86,8 @@ class ElfParser(dict):
         symtab_strtab_sh_offset = symtab_strtab_sh["offset"]
         symtab_strtab_sh_size   = symtab_strtab_sh["size"]
 
-        symtab_strings = ElfString(buffer[symtab_strtab_sh_offset:symtab_strtab_sh_offset+symtab_strtab_sh_size])
+        symtab_strings = ElfString(self.__buffer[symtab_strtab_sh_offset:symtab_strtab_sh_offset+symtab_strtab_sh_size])
 
         for symbol in self["symtab"]:
             symbol.set_name(symtab_strings.get_string(symbol["name"]))
 
-with open("elfparser\elf_test.axf", "rb") as f:
-    buffer = f.read()
-
-elf = ElfParser(buffer)
-
-pprint(elf, sort_dicts=False)
